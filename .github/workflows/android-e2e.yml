@@ -5,10 +5,14 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: android-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -31,7 +35,7 @@ jobs:
 
       - name: Install Patrol CLI
         run: |
-          dart pub global activate patrol_cli
+          dart pub global activate patrol_cli 4.3.1
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Patrol doctor
@@ -43,9 +47,12 @@ jobs:
           api-level: 34
           arch: x86_64
           profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
           script: |
+            adb wait-for-device
             adb devices
-            patrol test --target integration_test/smoke/app_launch_test.dart --no-uninstall
+            PATROL_ANALYTICS_ENABLED=false patrol test --target integration_test/smoke/app_launch_test.dart -d emulator-5554 --no-uninstall
 
       - name: Upload test artifacts
         if: always()
@@ -56,3 +63,4 @@ jobs:
             build/**/outputs/**/*.apk
             build/**/reports/**
             build/**/test-results/**
+            **/androidTest-results/**
