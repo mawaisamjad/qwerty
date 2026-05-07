@@ -18,7 +18,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify tools
+      - name: Verify tools and device
         run: |
           flutter --version
           adb version
