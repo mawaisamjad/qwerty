@@ -36,11 +36,6 @@ jobs:
       - name: Patrol doctor
         run: patrol doctor
 
-      - name: Prepare Patrol bundler workaround
-        run: |
-          mkdir -p patrol_test/home/runner/work/qwerty
-          ln -sfn "$GITHUB_WORKSPACE" patrol_test/home/runner/work/qwerty/qwerty
-
       - name: Run smoke test on real device
         run: |
           DEVICE_ID=$(adb devices | awk 'NR>1 && $2=="device"{print $1; exit}')
@@ -48,6 +43,12 @@ jobs:
             echo "No Android device connected"
             exit 1
           fi
+          rm -rf /tmp/qwerty-run
+          mkdir -p /tmp/qwerty-run
+          rsync -a --delete "$GITHUB_WORKSPACE/" /tmp/qwerty-run/
+
+          cd /tmp/qwerty-run
+          flutter pub get
           PATROL_ANALYTICS_ENABLED=false patrol test --target integration_test/smoke/app_launch_test.dart -d "$DEVICE_ID" --no-uninstall
 
       - name: Upload test artifacts
