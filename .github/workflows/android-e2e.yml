@@ -1,0 +1,75 @@
+name: Flutter Patrol E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: android-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Install Patrol CLI
+        run: |
+          dart pub global activate patrol_cli 4.3.1
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Patrol doctor
+        run: patrol doctor
+
+      - name: Run Patrol smoke test on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            adb wait-for-device
+            adb devices
+
+            # Workaround for patrol_cli bundling path issue.
+            mkdir -p patrol_test/home/runner/work/qwerty
+            ln -sfn "$GITHUB_WORKSPACE" patrol_test/home/runner/work/qwerty/qwerty
+
+            PATROL_ANALYTICS_ENABLED=false patrol test \
+              --target integration_test/smoke/app_launch_test.dart \
+              -d emulator-5554 \
+              --no-uninstall
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: patrol-results
+          path: |
+            build/**/outputs/**/*.apk
+            build/**/reports/**
+            build/**/test-results/**
+            **/androidTest-results/**
